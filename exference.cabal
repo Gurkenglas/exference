@@ -71,7 +71,6 @@ Library
   ghc-options: -O2
                -j
                -Wall
-               -Werror
                -fno-warn-unused-imports
                -fno-warn-orphans
                -fno-spec-constr
@@ -112,30 +111,30 @@ Library
                    DeriveDataTypeable
   hs-source-dirs: src
   Build-Depends:
-    base >=3 && <5,
-    base-orphans >=0.5.1 && <0.6,
+    base,
+    base-orphans,
     containers,
-    pretty >= 1.1,
-    deepseq >=1.4.1.1 && <1.5,
-    deepseq-generics >=0.1.1.2 && < 0.3,
-    unordered-containers >= 0.2.5 && < 0.3,
-    hashable >=1.2.4.0 && <1.3,
-    pqueue >=1.3.1 && < 1.4,
-    mmorph >= 1.0.4 && < 1.1,
+    pretty,
+    deepseq,
+    deepseq-generics,
+    unordered-containers,
+    hashable,
+    pqueue,
+    mmorph,
     transformers,
     mtl,
     vector,
     either,
-    haskell-src-exts >=1.17.1 && <1.18,
+    haskell-src-exts,
     hood,
-    process >=1.2.3.0 && <1.3,
+    process,
     parsec,
     directory,
     bifunctors,
     safe,
-    lens >= 4.12 && < 4.15,
+    lens,
     split,
-    multistate >= 0.6.2
+    multistate
 
 
 Executable exference
@@ -143,17 +142,17 @@ Executable exference
     buildable: True
     build-depends:
       exference,
-      base >=3 && <5,
+      base,
       containers,
       transformers,
       mtl,
       haskell-src-exts,
-      data-pprint >= 0.2.4,
+      data-pprint,
       deepseq,
       hood,
       process,
       either,
-      multistate >= 0.6.2
+      multistate
   } else {
     buildable: False
   }

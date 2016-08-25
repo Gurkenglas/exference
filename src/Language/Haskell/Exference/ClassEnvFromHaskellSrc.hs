@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
@@ -48,7 +47,6 @@ import Debug.Trace
 --   would be bad for that purpose.)
 getClassEnv :: ( ContainsType [String] w
                , MonadFix m
-               , Applicative m
                )
             => [QualifiedName]
             -> TypeDeclMap
@@ -68,7 +66,6 @@ type TempAsst = (QualifiedName, [HsType])
 
 getTypeClasses :: forall m r w s m0
                 . ( MonadFix m0
-                  , Applicative m0
                   , m ~ MultiRWST r w s m0
                   )
                => [QualifiedName]
@@ -77,7 +74,7 @@ getTypeClasses :: forall m r w s m0
                -> m [Either String HsTypeClass]
 getTypeClasses ds tDeclMap ms = do
   secondMap :: M.Map QualifiedName (Either String ([TempAsst], [TVarId])) <-
-    fmap M.fromList $ sequence
+    M.fromList <$> sequence
       [ [ (qn, x) --m (inner) -- []
         | let qn = convertModuleName moduleName name
         , x <- withMultiStateA (ConvData 0 M.empty) $ runEitherT $ let
@@ -105,7 +102,7 @@ getTypeClasses ds tDeclMap ms = do
       -- CARE: DONT USE STRICT METHODS ON THIS MAP
       --       (COMPILER WONT COMPLAIN)
     resultMap = LazyMap.mapWithKey helper secondMap
-  return $ LazyMap.elems $ resultMap
+  return $ LazyMap.elems resultMap
 
 getInstances :: forall m m0 r w s
               . ( m ~ MultiRWST r w s m0

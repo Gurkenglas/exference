@@ -227,11 +227,11 @@ showHsConstraint :: TypeVarIndex
                  -> HsConstraint
                  -> String
 showHsConstraint convMap (HsConstraint c ps) =
-  unwords $ show name : tyStrs  
+  unwords $ show name : tyStrs
  where
   name = tclass_name c
   tyStrs = showHsType convMap <$> ps
-  
+
 
 instance Show QueryClassEnv where
   show (QueryClassEnv _ cs _ _) = "(QueryClassEnv _ " ++ show cs ++ " _)"
@@ -286,7 +286,7 @@ inflateHsConstraints = inflate (S.fromList . f)
 -- uses f to find new elements. adds these new elements, and recursively
 -- tried to find even more elements. will not terminate if there are cycles
 -- in the application of f
-inflate :: (Ord a, Show a) => (a -> S.Set a) -> S.Set a -> S.Set a
+inflate :: Ord a => (a -> S.Set a) -> S.Set a -> S.Set a
 inflate f = fold . takeWhile (not . S.null) . iterate (foldMap f)
 
 constraintApplySubst :: Subst -> HsConstraint -> HsConstraint
@@ -345,7 +345,7 @@ showTypedVar i = do
 --                         ()
 --                         ""
 --                         s
--- 
+--
 -- typeParser :: forall m . (_) => Parser (m HsType)
 -- typeParser = parseAll
 --   where
@@ -382,7 +382,7 @@ applySubsts _ c@(TypeConstant _) = return c
 applySubsts _ c@(TypeCons _)     = return c
 applySubsts s (TypeArrow t1 t2)  = liftM2 TypeArrow (applySubsts s t1) (applySubsts s t2)
 applySubsts s (TypeApp t1 t2)    = liftM2 TypeApp   (applySubsts s t1) (applySubsts s t2)
-applySubsts s (TypeForall js cs t) = liftM2 (TypeForall js) 
+applySubsts s (TypeForall js cs t) = liftM2 (TypeForall js)
   (sequence $ constraintApplySubsts s <$> cs)
   (applySubsts (foldr IntMap.delete s js) t)
 

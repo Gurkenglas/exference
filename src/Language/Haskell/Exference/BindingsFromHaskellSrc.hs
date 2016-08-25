@@ -41,7 +41,7 @@ import Debug.Trace
 
 
 getDecls
-  :: (Monad m, Functor m)
+  :: Monad m
   => [QualifiedName]
   -> [HsTypeClass]
   -> TypeDeclMap
@@ -55,7 +55,7 @@ getDecls ds tcs tDeclMap modules = fmap (>>= either (return.Left) (map Right))
   return $ runEitherT $ transformDecl tcs ds mn tDeclMap d
 
 transformDecl
-  :: (Monad m, Functor m)
+  :: Monad m
   => [HsTypeClass]
   -> [QualifiedName]
   -> ModuleName
@@ -69,7 +69,7 @@ transformDecl tcs ds mn tDeclMap (TypeSig _loc names qtype)
 transformDecl _ _ _ _ _ = return []
 
 transformDecl'
-  :: (MonadMultiState ConvData m, Monad m, Functor m)
+  :: (MonadMultiState ConvData m)
   => [HsTypeClass]
   -> [QualifiedName]
   -> ModuleName
@@ -82,7 +82,7 @@ transformDecl' tcs ds mn tDeclMap (TypeSig _loc names qtype)
       return $ helper mn ctype <$> names
 transformDecl' _ _ _ _ _ = return []
 
-insName :: (Functor m, Monad m)
+insName :: Monad m
         => Type -> EitherT String m a -> EitherT String m a
 insName qtype = bimapEitherT (\x -> x ++ " in " ++ prettyPrint qtype) id
 
