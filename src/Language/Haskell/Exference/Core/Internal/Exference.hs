@@ -60,6 +60,7 @@ import Data.Typeable ( Typeable )
 import Control.Lens
 import Control.Monad.State ( StateT(..), State, gets, execStateT, get, runStateT, mapStateT )
 import Control.Monad.State ( MonadState )
+import Data.Bifunctor ( bimap )
 
 -- import Control.Concurrent.Chan
 import Control.Concurrent ( forkIO )
@@ -134,9 +135,7 @@ data ExferenceInput = ExferenceInput
 type ExferenceOutputElement = (Expression, [HsConstraint], ExferenceStats)
 data ExferenceChunkElement = ExferenceChunkElement
   { chunkBindingUsages :: BindingUsages
-#if BUILD_SEARCH_TREE
   , chunkSearchTree :: SearchTree
-#endif
   , chunkElements :: [ExferenceOutputElement]
   }
 
@@ -145,9 +144,7 @@ data FindExpressionsState = FindExpressionsState
   { _findExpressionsStateN :: Int    -- number of steps already performed
   , _findExpressionsStateWorst :: Float  -- worst rating of state in pqueue
   , _findExpressionsStateBindingUsages :: BindingUsages
-#if BUILD_SEARCH_TREE
   , _findExpressionsStateSt :: SearchTreeBuilder (StableName SearchNode)
-#endif
   , _findExpressionsStateStates :: RatedNodes -- pqueue
   }
 makeFields ''FindExpressionsState
@@ -190,9 +187,7 @@ findExpressions (ExferenceInput rawType
     0
     0
     M.empty
-#if BUILD_SEARCH_TREE
     (initialSearchTreeBuilder initNodeName (ExpHole 0))
-#endif
     (Q.singleton 0.0 rootSearchNode)
   t = forallify rawType
   rootSearchNode = SearchNode
@@ -213,23 +208,17 @@ findExpressions (ExferenceInput rawType
 #endif
     ""
     Nothing
-#if BUILD_SEARCH_TREE
   initNodeName = unsafePerformIO $ makeStableName $! rootSearchNode
-#endif
   transformSolutions :: [SearchNode] -> FindExpressionsState -> ExferenceChunkElement
   transformSolutions potentialSolutions (FindExpressionsState
       n'
       _
       newBindingUsages
-#if BUILD_SEARCH_TREE
       newSearchTreeBuilder
-#endif
       newNodes
     ) = ExferenceChunkElement
       newBindingUsages
-#if BUILD_SEARCH_TREE
-      buildSearchTree newSearchTreeBuilder initNodeName
-#endif
+      (buildSearchTree newSearchTreeBuilder initNodeName)
       [ (e, remainingConstraints, ExferenceStats n' d $ Q.size newNodes)
       | solution <- potentialSolutions
       , let contxt = view queryClassEnv solution
@@ -288,15 +277,13 @@ findExpressions (ExferenceInput rawType
         ]
     bindingUsages . maybe ignored at (view lastStepBinding s) . non 0 += 1
     states %= Q.union (Q.fromList filteredNew)
-#if BUILD_SEARCH_TREE
     st %=
       ((++) [ unsafePerformIO $ do
           n1 <- makeStableName $! ns
           n2 <- makeStableName $! s
           return (n1,n2,view expression ns)
-        | ns<-rNodes] &&&
+        | ns<-rNodes] `bimap`
       (:) (unsafePerformIO (makeStableName $! s)))
-#endif
     worst %= minimum . (: map fst filteredNew)
     gets $ transformSolutions potentialSolutions
 
@@ -347,12 +334,10 @@ stateStep :: Bool
           -> StateT SearchNode [] ()
 stateStep multiPM allowConstrs h = do
 
-  do
-    _s <- get
-    id
-      -- $ trace (showSearchNode' qNameIndex _s ++ " " ++ show (rateNode h _s))
-      $ return ()
-    -- trace (unwords [ show (view  depth                     _s)
+  -- do
+    -- _s <- get
+    -- traceM (showSearchNode' qNameIndex _s ++ " " ++ show (rateNode h _s))
+    -- traceM (unwords [ show (view  depth                     _s)
     --                , show (views goals          rateGoals  _s)
     --                , show (views providedScopes rateScopes _s)
     --                , show (view  expression                _s))])

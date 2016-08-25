@@ -6,9 +6,7 @@ module MainTest
   , printCheckExpectedResults
   , printStatistics
   , printMaxUsage
-#if BUILD_SEARCH_TREE
   , printSearchTree
-#endif
   , filterBindingsSimple -- TODO: refactor/move this
   )
 where
@@ -620,16 +618,14 @@ printMaxUsage h (bindings, deconss, sEnv) = sequence_ $ do
         highest = take 5 $ sortBy (flip $ comparing snd) $ M.toList stats
     lift $ putStrLn $ printf "%-12s: %s" name (show highest)
 
-#if BUILD_SEARCH_TREE
-printSearchTree :: ( ContainsType QNameIndex s )
-                => ExferenceHeuristicsConfig
+printSearchTree :: ExferenceHeuristicsConfig
                 -> EnvDictionary
                 -> MultiRWST r w s IO ()
 printSearchTree h (bindings, deconss, sEnv) = sequence_ $ do
   (name, allowUnused, patternM, typeStr, _expected, hidden) <- checkData
   return $ do
     ty <- unsafeReadType (sClassEnv_tclasses sEnv) exampleDataTypes (M.empty) typeStr
-    filteredBindings <- filterBindingsSimple hidden bindings
+    let filteredBindings = filterBindingsSimple hidden bindings
     let input = ExferenceInput
                   ty
                   filteredBindings
@@ -646,7 +642,7 @@ printSearchTree h (bindings, deconss, sEnv) = sequence_ $ do
     let showf (total,processed,expression)
           = printf "%d (+%d): %s" processed
                                   (total-processed)
-                                  (showExpressionPure qNameIndex expression)
+                                  (showExpression expression)
     lift $ putStrLn
          $ name
     lift $ putStrLn
@@ -654,4 +650,3 @@ printSearchTree h (bindings, deconss, sEnv) = sequence_ $ do
          $ fmap showf
          $ filterSearchTreeProcessedN 2
          $ tree
-#endif

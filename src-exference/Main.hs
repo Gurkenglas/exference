@@ -257,29 +257,23 @@ main = runO $ do
                               lift $ putStrLn $ "but only with additional contraints: " ++ intercalate ", " constrStrs
                             lift $ putStrLn $ replicate 40 ' ' ++ "(depth " ++ show d
                                         ++ ", " ++ show n ++ " steps, " ++ show m ++ " max pqueue size)"
-                  | PrintTree `elem` flags ->
-                      if not Flags_exference.buildSearchTree
-                        then lift $ putStrLn "exference-core was not compiled with flag \"buildSearchTree\""
-                        else do
-#if BUILD_SEARCH_TREE
-                          when (verbosity>0) $ lift $ putStrLn "[running findExpressionsWithStats ..]"
-                          let tree = chunkSearchTree $ last $ findExpressionsWithStats
-                                   $ input {input_maxSteps = 8192}
-                          let showf (total,processed,expression)
-                                = ( printf "%d (+%d):" processed (total-processed)
-                                  , showExpressionPure qNameIndex $ simplifyExpression expression
-                                  )
-                          let
-                            helper :: String -> Tree (String, String) -> [String]
-                            helper indent (Node (n,m) ts) =
-                              (printf "%-50s %s" (indent ++ n) m)
-                              : concatMap (helper ("  "++indent)) ts
-                          (lift . putStrLn) `mapM_` helper "" (showf <$> filterSearchTreeProcessedN 64 tree)
-#endif
-                          return ()
-                          -- putStrLn . showf `mapM_` draw
-                          --   -- $ filterSearchTreeProcessedN 2
-                          --   tree
+                  | PrintTree `elem` flags -> do
+                      when (verbosity>0) $ lift $ putStrLn "[running findExpressionsWithStats ..]"
+                      let tree = chunkSearchTree $ last $ findExpressionsWithStats
+                               $ input {input_maxSteps = 8192}
+                      let showf (total,processed,expression)
+                            = ( printf "%d (+%d):" processed (total-processed)
+                              , showExpression $ simplifyExpression expression
+                              )
+                      let
+                        helper :: String -> Tree (String, String) -> [String]
+                        helper indent (Node (n,m) ts) =
+                          (printf "%-50s %s" (indent ++ n) m)
+                          : concatMap (helper ("  "++indent)) ts
+                      (lift . putStrLn) `mapM_` helper "" (showf <$> filterSearchTreeProcessedN 64 tree)
+                      -- putStrLn . showf `mapM_` draw
+                      --   -- $ filterSearchTreeProcessedN 2
+                      --   tree
                   | EnvUsage `elem` flags -> lift $ do
                       when (verbosity>0) $ putStrLn "[running findExpressionsWithStats ..]"
                       let stats = chunkBindingUsages $ last $ findExpressionsWithStats input

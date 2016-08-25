@@ -31,6 +31,7 @@ import Control.Monad.Trans.Either
 import Control.Monad.State.Strict
 import qualified Data.Map as M
 import Data.List ( find )
+import Data.Bifunctor ( first )
 
 import Control.Monad.Trans.MultiRWS
 import Data.HList.ContainsType
@@ -132,7 +133,7 @@ getDataConss tcs ds tDeclMap modules = sequence $ do
         x           -> left $ "unknown ConDecl: " ++ show x
       convTs <- convertTypeInternal tcs (Just moduleName) ds tDeclMap `mapM` tys
       let qName = convertModuleName moduleName cname
-      return $ (qName, convTs)
+      return (qName, convTs)
   let
     addConsMsg = (++) $ show name ++ ": "
   let
@@ -147,10 +148,7 @@ getDataConss tcs ds tDeclMap modules = sequence $ do
                , (rtype, consDatas, False)
                )
         -- TODO: actually determine if stuff is recursive or not
-  return $ do
-    convResult <- withMultiStateA (ConvData 0 M.empty) $ runEitherT convAction
-    return $ either (Left . addConsMsg) Right convResult
-    -- TODO: replace this by bimap..
+  return $ first addConsMsg <$> withMultiStateA (ConvData 0 M.empty) (runEitherT convAction)
 
 getClassMethods
   :: (Monad m, Functor m)
