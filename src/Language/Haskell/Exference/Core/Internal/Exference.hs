@@ -58,8 +58,9 @@ import Data.Foldable ( foldMap, sum, asum, traverse_ )
 import Control.Monad.Morph ( lift )
 import Data.Typeable ( Typeable )
 import Control.Lens
-import Control.Monad.State ( StateT(..), State, gets, execStateT, get, runStateT, mapStateT, state, MonadState )
+import Control.Monad.State ( StateT(..), State, gets, execStateT, get, runStateT, mapStateT, state, MonadState, evalState )
 import Data.Bifunctor ( bimap )
+import Control.Alternative.Pointed ( manyLazy )
 
 -- import Control.Concurrent.Chan
 import Control.Concurrent ( forkIO )
@@ -180,7 +181,48 @@ findExpressions (ExferenceInput rawType
                                          -- not worth the refactor atm.
                                 memLimit
                                 heuristics) =
-  take maxSteps $ unfoldr helper rootFindExpressionState
+  take maxSteps $ (`evalState` rootFindExpressionState) $ manyLazy $ do
+    s <- zoom states $ StateT Q.maxView
+    qsize <- uses states Q.size
+    n' <- n <<+= 1
+    worst' <- use worst
+    let
+      -- actual work happens in stateStep
+      rNodes = (`execStateT` s)
+        $ stateStep multiPM
+                    allowConstraints
+                    heuristics
+      -- distinguish "finished"/"unfinished" sub-SearchNodes
+      (potentialSolutions, futures) = partition (views goals Seq.null) rNodes
+      -- this cutoff is somewhat arbitrary, and can, theoretically,
+      -- distort the order of the results (i.e.: lead to results being
+      -- omitted).
+      filteredNew = fromMaybe id
+        [ filter ((>cutoff) . fst)
+        | qsize > maxSteps
+        , mmax <- memLimit
+        , let cutoff = worst' * fromIntegral mmax
+                              / fromIntegral qsize
+        ]
+        [ ( rateNode heuristics newS + 4.5*f (fromIntegral n')
+          , newS)
+        | newS <- futures
+        , let f :: Float -> Float
+              f x | x > 900 = 0.0
+                  | otherwise = let k = 1.111e-3*x
+                                 in 1 + 2*k**3 - 3*k**2
+        ]
+    bindingUsages . maybe ignored at (view lastStepBinding s) . non 0 += 1
+    states %= Q.union (Q.fromList filteredNew)
+    st %=
+      ((++) [ unsafePerformIO $ do
+          n1 <- makeStableName $! ns
+          n2 <- makeStableName $! s
+          return (n1,n2,view expression ns)
+        | ns<-rNodes] `bimap`
+      (:) (unsafePerformIO (makeStableName $! s)))
+    worst %= minimum . (: map fst filteredNew)
+    gets $ transformSolutions potentialSolutions
  where
   rootFindExpressionState = FindExpressionsState
     0
@@ -240,49 +282,6 @@ findExpressions (ExferenceInput rawType
               --   * fromIntegral (length $ show e)<
               --   )
       ]
-  helper :: FindExpressionsState -> Maybe (ExferenceChunkElement, FindExpressionsState)
-  helper = runStateT $ do
-    s <- zoom states $ StateT Q.maxView
-    qsize <- uses states Q.size
-    n' <- n <<+= 1
-    worst' <- use worst
-    let
-      -- actual work happens in stateStep
-      rNodes = (`execStateT` s)
-        $ stateStep multiPM
-                    allowConstraints
-                    heuristics
-      -- distinguish "finished"/"unfinished" sub-SearchNodes
-      (potentialSolutions, futures) = partition (views goals Seq.null) rNodes
-      -- this cutoff is somewhat arbitrary, and can, theoretically,
-      -- distort the order of the results (i.e.: lead to results being
-      -- omitted).
-      filteredNew = fromMaybe id
-        [ filter ((>cutoff) . fst)
-        | qsize > maxSteps
-        , mmax <- memLimit
-        , let cutoff = worst' * fromIntegral mmax
-                              / fromIntegral qsize
-        ]
-        [ ( rateNode heuristics newS + 4.5*f (fromIntegral n')
-          , newS)
-        | newS <- futures
-        , let f :: Float -> Float
-              f x | x > 900 = 0.0
-                  | otherwise = let k = 1.111e-3*x
-                                 in 1 + 2*k**3 - 3*k**2
-        ]
-    bindingUsages . maybe ignored at (view lastStepBinding s) . non 0 += 1
-    states %= Q.union (Q.fromList filteredNew)
-    st %=
-      ((++) [ unsafePerformIO $ do
-          n1 <- makeStableName $! ns
-          n2 <- makeStableName $! s
-          return (n1,n2,view expression ns)
-        | ns<-rNodes] `bimap`
-      (:) (unsafePerformIO (makeStableName $! s)))
-    worst %= minimum . (: map fst filteredNew)
-    gets $ transformSolutions potentialSolutions
 
 rateNode :: ExferenceHeuristicsConfig -> SearchNode -> Float
 rateNode h s = 0.0 - rateGoals h (view goals s) - view depth s + rateUsage h s
@@ -504,7 +503,8 @@ stateStep multiPM allowConstrs h = do
         goals <>= Seq.fromList
           (ala Endo foldMap (applierl $> goalApplySubst provSS)
           <$> newGoals)
-        builderApplySubst substs
+        goals . mapped %= goalApplySubst substs
+        providedScopes . scopes . each . varBindings . each %= varPBindingApplySubsts substs
         expression %= fillExprHole var
           (foldl ExpApply coreExp (map ExpHole vars))
         traverse_ (\r -> varUses . singular (ix $ fst r) += 1) applierr
@@ -589,7 +589,7 @@ addScopePatternMatch multiPM goalType vid sid bindings = case bindings of
                                    vid
                                    sid
                                    (reverse newBinds ++ bindingRest)
-            in liftM mapFunc1 unifyResult
+            in mapFunc1 <$> unifyResult
           mapFunc (matchParam, matchers@(_:_), False) | multiPM = let
             unifyResult = unifyRightOffset vtResult
                                            (HsTypeOffset matchParam offset)
@@ -609,9 +609,9 @@ addScopePatternMatch multiPM goalType vid sid bindings = case bindings of
                        , (newVid, reverse newBinds, newSid) )
               builderSetReason $ "pattern matching on " ++ showVar v
               expression %= fillExprHole vid (ExpCaseMatch expVar $ map fst mData)
-              liftM concat $ map snd mData `forM` \(newVid, newBinds, newSid) ->
+              fmap concat $ map snd mData `forM` \(newVid, newBinds, newSid) ->
                 addScopePatternMatch multiPM goalType newVid newSid (newBinds++bindingRest)
-            in liftM mapFunc2 unifyResult
+            in mapFunc2 <$> unifyResult
           mapFunc _ = Nothing -- TODO: decons for recursive data types
   -- where
   --  (<&>) = flip (<$>)

@@ -4,7 +4,6 @@ module Language.Haskell.Exference.Core.Internal.ExferenceNodeBuilder
   ( SearchNodeBuilder
   , builderSetReason
   , builderGetTVarOffset
-  , builderApplySubst
   , builderAllocVar
   )
 where
@@ -59,10 +58,3 @@ builderAllocVar = do
   vid <- use nextVarId
   varUses . at vid ?= 0
   nextVarId <<+= 1
-
--- apply substs in goals and scopes
--- not contraintGoals, because that's handled by caller
-builderApplySubst :: MonadState SearchNode m => Substs -> m ()
-builderApplySubst substs = do
-  goals . mapped %= goalApplySubst substs
-  providedScopes . scopes . each . varBindings . each %= varPBindingApplySubsts substs
