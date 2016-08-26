@@ -565,46 +565,33 @@ addScopePatternMatch multiPM goalType vid sid bindings = case bindings of
       _ | not $ null vtParams -> return Nothing
         | otherwise -> sequenceA . asum . map mapFunc =<< use deconss where
           mapFunc :: Monad m => DeconstructorBinding -> Maybe (StateT SearchNode m [TGoal])
-          mapFunc (matchParam, ms, flag) = do
+          mapFunc (matchParam, ms, isrecursive) = do
             unifyResult <- unifyRightOffset vtResult (HsTypeOffset matchParam offset)
-            case (ms, flag) of
-              ([(matchId, matchRs)], False) -> Just $ do -- m
+            guard $ not isrecursive -- TODO: decons for recursive data types
+            case ms of
+              [(matchId, matchRs)] -> Just $ do -- m
                 vars <- replicateM (length matchRs) builderAllocVar
                 varUses . singular (ix v) += 1
                 builderSetReason $ "pattern matching on " ++ showVar v
                 let newProvTypes = map (snd . applySubsts unifyResult . incF) matchRs
-                    newBinds = zipWith (\x y -> splitBinding (VarBinding x y))
-                                       vars
-                                       newProvTypes
-                    expr = ExpLetMatch matchId
-                                       (zip vars matchRs)
-                                       expVar
-                                       (ExpHole vid)
+                    newBinds = zipWith (\x y -> splitBinding (VarBinding x y)) vars newProvTypes
+                    expr = ExpLetMatch matchId (zip vars matchRs) expVar (ExpHole vid)
                 expression %= fillExprHole vid expr
-                unless (null matchRs) $
-                  maxTVarId %= max (maximum $ map largestId newProvTypes)
-                addScopePatternMatch multiPM
-                                     goalType
-                                     vid
-                                     sid
-                                     (reverse newBinds ++ bindingRest)
-              (matchers@(_:_), False) | multiPM -> Just $ do -- m
+                unless (null matchRs) $ maxTVarId %= max (maximum $ map largestId newProvTypes)
+                addScopePatternMatch multiPM goalType vid sid (reverse newBinds ++ bindingRest)
+              matchers@(_:_) | multiPM -> Just $ do -- m
                 (mDatal, mDatar) <- fmap unzip $ matchers `forM` \(matchId, matchRs) -> do -- m
                   newSid <- zoom providedScopes $ state $ addScope sid
-                  let resultTypes = map incF matchRs
                   vars <- replicateM (length matchRs) builderAllocVar
                   varUses . singular (ix v) += 1
                   newVid <- nextVarId <<+= 1
-                  let newProvTypes = map (snd . applySubsts unifyResult) resultTypes
+                  let newProvTypes = map (snd . applySubsts unifyResult . incF) matchRs
                       newBinds = zipWith (\x y -> splitBinding (VarBinding x y)) vars newProvTypes
-                  unless (null matchRs) $
-                    maxTVarId %= max (maximum $ map largestId newProvTypes)
+                  unless (null matchRs) $ maxTVarId %= max (maximum $ map largestId newProvTypes)
                   return ( (matchId, zip vars newProvTypes, ExpHole newVid)
                          , (newVid, reverse newBinds, newSid) )
                 builderSetReason $ "pattern matching on " ++ showVar v
                 expression %= fillExprHole vid (ExpCaseMatch expVar mDatal)
                 fmap concat $ mDatar `forM` \(newVid, newBinds, newSid) ->
                   addScopePatternMatch multiPM goalType newVid newSid (newBinds++bindingRest)
-              _ -> Nothing -- TODO: decons for recursive data types
-  -- where
-  --  (<&>) = flip (<$>)
+              _ -> Nothing

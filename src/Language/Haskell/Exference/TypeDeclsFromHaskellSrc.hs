@@ -52,7 +52,7 @@ data HsTypeDecl = HsTypeDecl
 type TypeDeclMap = Map QualifiedName HsTypeDecl
 
 applyTypeDecls :: Map QualifiedName (Either String HsTypeDecl)
-               -> HsType 
+               -> HsType
                -> Either String HsType
 applyTypeDecls m = go
  where
@@ -167,8 +167,4 @@ unsafeReadType tcs ds tDeclMap s = do
     Right (t, _) -> t
 
 unsafeReadType0 :: (Monad m) => String -> MultiRWST r w s m HsType
-unsafeReadType0 s = do
-  parseRes <- runEitherT $ parseType [] Nothing [] (M.empty) (haskellSrcExtsParseMode "type") s
-  return $ case parseRes of
-    Left _ -> error $ "unsafeReadType: could not parse type: " ++ s
-    Right (t, _) -> t
+unsafeReadType0 = unsafeReadType [] [] (M.empty)
