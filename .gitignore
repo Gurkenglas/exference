@@ -11,3 +11,4 @@ cabal.sandbox.config
 \#*.gui\#
 Main
 .stack-work
+.tags1

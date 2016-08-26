@@ -1,9 +1,9 @@
+{-# LANGUAGE PartialTypeSignatures #-}
+
 module Language.Haskell.Exference.Core.Internal.ExferenceNodeBuilder
   ( SearchNodeBuilder
-  , modifyNodeBy
   , builderSetReason
   , builderGetTVarOffset
-  , builderAddScope
   , builderApplySubst
   , builderAllocVar
   )
@@ -23,6 +23,7 @@ import Control.Monad.State ( State
                            , get
                            , put
                            , gets
+                           , state
                            )
 import Control.Monad.State.Lazy ( MonadState )
 import Control.Applicative
@@ -36,9 +37,6 @@ import Control.Lens
 
 
 type SearchNodeBuilder a = State SearchNode a
-
-modifyNodeBy :: SearchNode -> SearchNodeBuilder () -> SearchNode
-modifyNodeBy = flip execState
 
 {-
 builderAddVars :: [TVarId] -> SearchNodeBuilder ()
@@ -61,13 +59,6 @@ builderAllocVar = do
   vid <- use nextVarId
   varUses . at vid ?= 0
   nextVarId <<+= 1
-
--- take the current scope, add new scope, return new id
-builderAddScope :: MonadState SearchNode m => ScopeId -> m ScopeId
-builderAddScope parentId = do
-  (newId, newScopes) <- uses providedScopes $ addScope parentId
-  providedScopes .= newScopes
-  return newId
 
 -- apply substs in goals and scopes
 -- not contraintGoals, because that's handled by caller

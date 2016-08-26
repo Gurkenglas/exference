@@ -24,7 +24,6 @@ module Language.Haskell.Exference.Core.Internal.ExferenceNode
   , mkGoals
   , addScope
   , scopeGetAllBindings
-  , scopesAddPBinding
   , splitBinding
   , addNewScopeGoal
   , initialScopes
@@ -46,6 +45,9 @@ module Language.Haskell.Exference.Core.Internal.ExferenceNode
   , HasPreviousNode (..)
   , HasLastStepReason (..)
   , HasLastStepBinding (..)
+  , HasScopes (..)
+  , HasSuperscopes (..)
+  , HasVarBindings (..)
   )
 where
 
@@ -111,12 +113,15 @@ varPBindingApplySubsts ss (v,rt,pt,fvs,cs) =
 
 type ScopeId = Int
 
-data Scope = Scope [VarPBinding] [ScopeId]
-            -- scope bindings,   superscopes
-  deriving Generic
-data Scopes = Scopes ScopeId (IntMap.IntMap Scope)
-  deriving Generic
-              -- next id     scopes
+data Scope = Scope
+  { _scopeVarBindings :: [VarPBinding]
+  , _scopeSuperscopes :: [ScopeId]
+  } deriving Generic
+
+data Scopes = Scopes
+  { _scopesNextVarId :: ScopeId
+  , _scopesScopes :: IntMap.IntMap Scope
+  } deriving Generic
 
 initialScopes :: Scopes
 initialScopes = Scopes 1 (IntMap.singleton 0 $ Scope [] [])
@@ -132,19 +137,6 @@ scopesApplySubsts substs (Scopes i scopeMap) = Scopes i $ IntMap.map scopeF scop
   where
     scopeF (Scope binds ids) = Scope (map bindF binds) ids
     bindF = varPBindingApplySubsts substs
-
-{-
-scopesAddBinding :: ScopeId -> VarBinding -> Scopes -> Scopes
-scopesAddBinding sid binding scopes =
-  scopesAddPBinding sid (splitBinding binding) scopes
--}
-
-scopesAddPBinding :: ScopeId -> VarPBinding -> Scopes -> Scopes
-scopesAddPBinding sid binding (Scopes nid sMap) = Scopes nid newMap
-  where
-    newMap = IntMap.adjust addBinding sid sMap
-    addBinding :: Scope -> Scope
-    addBinding (Scope vbinds ids) = Scope (binding:vbinds) ids
 
 addScope :: ScopeId -> Scopes -> (ScopeId, Scopes)
 addScope parent (Scopes nid sMap) = (nid, Scopes (nid+1) newMap)
@@ -267,6 +259,8 @@ splitBinding :: VarBinding -> VarPBinding
 splitBinding (VarBinding v t) = let (rt,pts,fvs,cs) = splitArrowResultParams t in (v,rt,pts,fvs,cs)
 
 makeFields ''SearchNode
+makeFields ''Scope
+makeFields ''Scopes
 
 showNodeDevelopment :: SearchNode -> String
 showNodeDevelopment node = unlines

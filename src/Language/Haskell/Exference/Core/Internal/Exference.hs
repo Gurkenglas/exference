@@ -58,8 +58,7 @@ import Data.Foldable ( foldMap, sum, asum, traverse_ )
 import Control.Monad.Morph ( lift )
 import Data.Typeable ( Typeable )
 import Control.Lens
-import Control.Monad.State ( StateT(..), State, gets, execStateT, get, runStateT, mapStateT )
-import Control.Monad.State ( MonadState )
+import Control.Monad.State ( StateT(..), State, gets, execStateT, get, runStateT, mapStateT, state, MonadState )
 import Data.Bifunctor ( bimap )
 
 -- import Control.Concurrent.Chan
@@ -351,7 +350,8 @@ stateStep multiPM allowConstrs h = do
 
   let
     -- if type is TypeArrow, transform to lambda expression.
-    arrowStep :: MonadState SearchNode m => HsType -> [VarBinding] -> m ()
+    -- arrowStep :: MonadState SearchNode m => HsType -> [VarBinding] -> m ()
+    arrowStep :: Monad m => HsType -> [VarBinding] -> StateT SearchNode m ()
     arrowStep g ts
       -- descend until no more TypeArrows, accumulating what is seen.
       | TypeArrow t1 t2 <- g = do
@@ -360,7 +360,7 @@ stateStep multiPM allowConstrs h = do
       -- finally, do the goal/expression transformation.
       | otherwise = do
           nextId <- nextVarId <<+= 1
-          newScopeId <- builderAddScope scopeId
+          newScopeId <- zoom providedScopes $ state $ addScope scopeId
           expression %= fillExprHole var
             (foldl (\e (VarBinding v ty) -> ExpLambda v ty e) (ExpHole nextId) ts)
           depth += heuristics_functionGoalTransform h
@@ -467,7 +467,7 @@ stateStep multiPM allowConstrs h = do
             (ExpApply coreExp $ ExpHole vParam)
             (ExpHole var))
           goals %= ((VarBinding vParam d, scopeId) <|)
-          newScopeId <- builderAddScope scopeId
+          newScopeId <- zoom providedScopes $ state $ addScope scopeId
           constraintGoals <>= provConstrs
           traverse_ (\r -> varUses . singular (ix $ fst r) += 1) applierr
           maxTVarId %= max (maximum $ map largestId dependencies)
@@ -537,21 +537,21 @@ stateStep multiPM allowConstrs h = do
 -- TGoals are duplicated when the pattern-matching involves more than one case,
 -- as the goals for different cases are distinct because their scopes are
 -- modified when new bindings are added by the pattern-matching.
-addScopePatternMatch :: MonadState SearchNode m
+addScopePatternMatch :: Monad m
                      => Bool -- should p-m on anything but newtypes?
                      -> HsType -- the current goal (should be returned in one
                                --  form or another)
                      -> Int    -- goal id (hole id)
                      -> ScopeId -- scope for this goal
                      -> [VarPBinding]
-                     -> m [TGoal]
+                     -> StateT SearchNode m [TGoal]
 addScopePatternMatch multiPM goalType vid sid bindings = case bindings of
   []                                    -> return [(VarBinding vid goalType, sid)]
   (b@(v,vtResult,vtParams,_,_):bindingRest) -> do
     offset <- builderGetTVarOffset
     let incF = incVarIds (+offset)
     let expVar = ExpVar v (foldr TypeArrow vtResult vtParams)
-    providedScopes %= scopesAddPBinding sid b
+    ((providedScopes :: Lens' SearchNode Scopes) . (scopes :: Lens' Scopes (IntMap.IntMap Scope)) . (ix sid :: Traversal' (IntMap.IntMap Scope) Scope) . (varBindings :: Lens' Scope [VarPBinding]) :: ASetter' SearchNode [VarPBinding]) %= (:) b
     let defaultHandleRest = addScopePatternMatch multiPM goalType vid sid bindingRest
     case vtResult of
       TypeVar {}    -> defaultHandleRest -- dont pattern-match on variables, even if it unifies
@@ -563,7 +563,7 @@ addScopePatternMatch multiPM goalType vid sid bindings = case bindings of
       _ | not $ null vtParams -> defaultHandleRest
         | otherwise -> fromMaybe defaultHandleRest . asum . map mapFunc =<< use deconss
          where
-          mapFunc :: MonadState SearchNode m => DeconstructorBinding -> Maybe (m [TGoal])
+          mapFunc :: Monad m => DeconstructorBinding -> Maybe (StateT SearchNode m [TGoal])
           mapFunc (matchParam, [(matchId, matchRs)], False) = let
             resultTypes = map incF matchRs
             unifyResult = unifyRightOffset vtResult
@@ -596,7 +596,7 @@ addScopePatternMatch multiPM goalType vid sid bindings = case bindings of
             -- inputType = incF matchParam
             mapFunc2 substs = do -- m
               mData <- matchers `forM` \(matchId, matchRs) -> do -- m
-                newSid <- builderAddScope sid
+                newSid <- zoom providedScopes $ state $ addScope sid
                 let resultTypes = map incF matchRs
                 vars <- replicateM (length matchRs) builderAllocVar
                 varUses . singular (ix v) += 1
