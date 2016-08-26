@@ -20,7 +20,6 @@ module Language.Haskell.Exference.Core.Internal.ExferenceNode
   , varPBindingApplySubsts
   , goalApplySubst
   , showNodeDevelopment
-  , scopesApplySubsts
   , mkGoals
   , addScope
   , scopeGetAllBindings
@@ -131,12 +130,6 @@ scopeGetAllBindings sid ss@(Scopes _ scopeMap) =
   case IntMap.lookup sid scopeMap of
     Nothing -> []
     Just (Scope binds ids) -> binds ++ concatMap (`scopeGetAllBindings` ss) ids
-
-scopesApplySubsts :: Substs -> Scopes -> Scopes
-scopesApplySubsts substs (Scopes i scopeMap) = Scopes i $ IntMap.map scopeF scopeMap
-  where
-    scopeF (Scope binds ids) = Scope (map bindF binds) ids
-    bindF = varPBindingApplySubsts substs
 
 addScope :: ScopeId -> Scopes -> (ScopeId, Scopes)
 addScope parent (Scopes nid sMap) = (nid, Scopes (nid+1) newMap)

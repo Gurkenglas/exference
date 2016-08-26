@@ -65,4 +65,4 @@ builderAllocVar = do
 builderApplySubst :: MonadState SearchNode m => Substs -> m ()
 builderApplySubst substs = do
   goals . mapped %= goalApplySubst substs
-  providedScopes %= scopesApplySubsts substs
+  providedScopes . scopes . each . varBindings . each %= varPBindingApplySubsts substs
