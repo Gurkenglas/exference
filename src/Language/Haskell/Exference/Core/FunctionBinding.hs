@@ -5,12 +5,8 @@ module Language.Haskell.Exference.Core.FunctionBinding
   )
 where
 
-
-
 import Language.Haskell.Exference.Core.Types
 import Language.Haskell.Exference.Core.Expression
-
-
 
 type FunctionBinding = (HsType, QualifiedName, Float, [HsConstraint], [HsType])
                       -- input-type, name, rating, contraints, result-types
