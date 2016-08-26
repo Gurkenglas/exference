@@ -1,6 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE BangPatterns #-}
-
 module Language.Haskell.Exference.Core.Internal.ExferenceNodeBuilder
   ( SearchNodeBuilder
   , modifyNodeBy
@@ -25,6 +22,7 @@ import Control.Monad.State ( State
                            , modify
                            , get
                            , put
+                           , gets
                            )
 import Control.Monad.State.Lazy ( MonadState )
 import Control.Applicative
@@ -51,12 +49,10 @@ builderAddVars = (varUses <>=) . M.fromList . map (,0)
 builderSetReason :: MonadState SearchNode m => String -> m ()
 builderSetReason r = do
   lastStepReason .= r
-#if LINK_NODES
-  previousNode <~ liftM Just get
-#endif
+  previousNode <~ gets Just
 
 builderGetTVarOffset :: MonadState SearchNode m => m TVarId
-builderGetTVarOffset = liftM (+1) $ use maxTVarId
+builderGetTVarOffset = uses maxTVarId (+1)
  -- TODO: is (+1) really necessary? it was in pre-transformation code,
  --       but i cannot find good reason now.. test?
 

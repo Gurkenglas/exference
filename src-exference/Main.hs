@@ -70,7 +70,6 @@ import MainConfig
 import MainTest
 
 import Paths_exference
-import qualified Flags_exference
 
 import System.Environment ( getArgs )
 import System.Console.GetOpt

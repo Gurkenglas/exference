@@ -203,9 +203,7 @@ findExpressions (ExferenceInput rawType
     (largestId t)
     0
     0.0
-#if LINK_NODES
     Nothing
-#endif
     ""
     Nothing
   initNodeName = unsafePerformIO $ makeStableName $! rootSearchNode

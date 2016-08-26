@@ -77,10 +77,6 @@ Library
                -fno-spec-constr
                -auto-all
                -caf-all
-  If flag(linkNodes) || flag(buildSearchTree)
-    cpp-options: -DLINK_NODES
-  If flag(buildSearchTree)
-    cpp-options: -DBUILD_SEARCH_TREE
   exposed-modules: Language.Haskell.Exference.Core
                    Language.Haskell.Exference.Core.Types
                    Language.Haskell.Exference.Core.TypeUtils
@@ -99,7 +95,6 @@ Library
                    Language.Haskell.Exference.EnvironmentParser
                    Language.Haskell.Exference.FunctionDecl
                    Paths_exference
-                   Flags_exference
   other-modules:   Language.Haskell.Exference.Core.Internal.Unify,
                    Language.Haskell.Exference.Core.Internal.ConstraintSolver,
                    Language.Haskell.Exference.Core.Internal.ExferenceNode,
@@ -174,14 +169,7 @@ Executable exference
                -auto-all
                -caf-all
                -- -fllvm
-  If flag(buildSearchTree) {
-    ghc-options:
                -with-rtsopts "-H4G -M6G -N"
-  } else {
-    ghc-options:
-               -with-rtsopts "-H2G -M4G -N"
-
-  }
 
 
   extensions: NoMonomorphismRestriction
