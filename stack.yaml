@@ -1,12 +1,12 @@
-flags:
-  exference:
-    build-executables: false
+flags: {}
 extra-package-dbs: []
 packages:
 - '.'
 extra-deps:
 - FPretty-1.1
+- data-pprint-0.2.4.1
 - hood-0.3
 - multistate-0.7.1.1
 - pqueue-1.3.1.1
+- time-1.5.0.1
 resolver: nightly-2016-08-25
