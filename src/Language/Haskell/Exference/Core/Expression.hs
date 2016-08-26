@@ -54,40 +54,7 @@ data Expression = ExpVar TVarId HsType -- a
 
 instance NFData Expression where rnf = genericRnf
 
--- instance Show Expression where
---   showsPrec _ (ExpVar i) = showString $ showVar i
---   showsPrec d (ExpName s) = showsPrec d s
---   showsPrec d (ExpLambda i e) =
---     showParen (d>0) $ showString ("\\" ++ showVar i ++ " -> ") . showsPrec 1 e
---   showsPrec d (ExpApply e1 e2) =
---     showParen (d>1) $ showsPrec 2 e1 . showString " " . showsPrec 3 e2
---   showsPrec _ (ExpHole i) = showString $ "_" ++ showVar i
---   showsPrec d (ExpLetMatch n vars bindExp inExp) =
---       showParen (d>2)
---     $ showString ("let ("++show n++" "++intercalate " " (map showVar vars) ++ ") = ")
---     . shows bindExp . showString " in " . showsPrec 0 inExp
---   showsPrec d (ExpLet i bindExp inExp) =
---       showParen (d>2)
---     $ showString ("let " ++ showVar i ++ " = ")
---     . showsPrec 3 bindExp
---     . showString " in "
---     . showsPrec 0 inExp
---   showsPrec d (ExpCaseMatch bindExp alts) =
---       showParen (d>2)
---     $ showString ("case ")
---     . showsPrec 3 bindExp
---     . showString " of { "
---     . ( \s -> intercalate "; "
---            (map (\(cons, vars, expr) ->
---               show cons++" "++intercalate " " (map showVar vars)++" -> "
---               ++showsPrec 3 expr "")
---             alts)
---          ++ s
---       )
---     . showString " }"
-
-refreshVarTypeBinding :: forall m
-                       . MonadMultiState (Map TVarId HsType) m
+refreshVarTypeBinding :: MonadMultiState (Map TVarId HsType) m
                       => TVarId
                       -> HsType
                       -> m ()
@@ -147,7 +114,7 @@ showExpression e = runIdentity
     [ showParen (d>1) $ e1Shows . showString " " . e2Shows
     | e1Shows <- h 2 e1
     , e2Shows <- h 3 e2
-    ]    
+    ]
   h _ (ExpHole i) = return $ showString $ "_" ++ showVar i
   h d (ExpLetMatch n vars bindExp inExp) =
     [ showParen (d>2)
@@ -162,7 +129,7 @@ showExpression e = runIdentity
     , let nStr = show n
     , varNames  <- mapM (showTypedVar . fst) vars
     ]
-      
+
   h d (ExpLet i _ bindExp inExp) =
     [ showParen (d>2)
     $ showString ("let " ++ varName ++ " = ")
@@ -216,4 +183,3 @@ fillExprHole vid t (ExpCaseMatch bindExp alts) =
                                             ]
 fillExprHole _ _ t@ExpName{} = t
 fillExprHole _ _ t@ExpVar{}  = t
-
