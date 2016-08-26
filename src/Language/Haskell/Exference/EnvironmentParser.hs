@@ -24,7 +24,6 @@ import Language.Haskell.Exference.Core.FunctionBinding
 import Language.Haskell.Exference.FunctionDecl
 
 import Language.Haskell.Exference.Core.Types
-import Language.Haskell.Exference.SimpleDict
 import Language.Haskell.Exference.Core.Expression
 import Language.Haskell.Exference.Core.ExferenceStats
 

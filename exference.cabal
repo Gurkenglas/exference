@@ -86,7 +86,6 @@ Library
                    Language.Haskell.Exference.Core.FunctionBinding
                    Language.Haskell.Exference.Core.SearchTree
   exposed-modules: Language.Haskell.Exference
-                   Language.Haskell.Exference.SimpleDict
                    Language.Haskell.Exference.ExpressionToHaskellSrc
                    Language.Haskell.Exference.TypeFromHaskellSrc
                    Language.Haskell.Exference.TypeDeclsFromHaskellSrc
