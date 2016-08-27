@@ -161,7 +161,6 @@ Executable exference
                -O2
                -j
                -Wall
-               -Werror
                -fno-warn-unused-imports
                -fno-warn-orphans
                -threaded
