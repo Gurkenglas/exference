@@ -22,7 +22,6 @@ import Language.Haskell.Exference.TypeDeclsFromHaskellSrc
 import Language.Haskell.Exference.Core.FunctionBinding
 import Language.Haskell.Exference.EnvironmentParser
 
-import Language.Haskell.Exference.SimpleDict
 import Language.Haskell.Exference.Core.Types
 import Language.Haskell.Exference.Core.TypeUtils
 import Language.Haskell.Exference.Core.Expression
@@ -151,10 +150,10 @@ main = runO $ do
   argv <- getArgs
   defaultEnvPath <- getDataFileName "environment"
   (flags, inputs) <- mainOpts argv
-  let verbosity = sum $ [x | Verbose x <- flags ]
-  let qualification = head $ [x | Qualification x <- flags] ++ [0]
+  let verbosity = sum [x | Verbose x <- flags ]
+  let qualification = head [x | Qualification x <- flags] ++ [0]
   let
-    printVersion = do
+    printVersion =
       putStrLn $ "exference version " ++ showVersion version
   if | [Version] == flags   -> printVersion
      | Help    `elem` flags -> putStrLn fullUsageInfo >> putStrLn "TODO"
@@ -207,13 +206,13 @@ main = runO $ do
                                                   (haskellSrcExtsParseMode "inputtype")
                                                   x
             case eParsedType of
-              Left err -> lift $ do
+              Left err -> lift $
                 putStrLn $ "could not parse input type: " ++ err
               Right (parsedType, tVarIndex) -> do
                 let typeStr = showHsType tVarIndex parsedType
                 when (verbosity>0) $ lift $ putStrLn $ "input type parsed as: " ++ typeStr
                 let unresolvedIdents = findInvalidNames validNames parsedType
-                when (not $ null unresolvedIdents) $ lift $ do
+                unless (null unresolvedIdents) $ lift $ do
                   putStrLn $ "warning: unresolved idents in input: "
                            ++ intercalate ", " (nub $ show <$> unresolvedIdents)
                   putStrLn $ "(this may be harmless, but no instances will be connected to these.)"
@@ -235,27 +234,26 @@ main = runO $ do
                        else
                          testHeuristicsConfig { heuristics_solutionLength = 0.0 })
                 when (verbosity>0) $ lift $ do
-                  putStrLn $ "full input:"
+                  putStrLn "full input:"
                   doc <- pprint input
                   print doc
+                let foo :: _ => [ExferenceOutputElement]-> t IO ()
+                    foo [] = lift $ putStrLn "[no results]"
+                    foo rs = rs `forM_` \(e, constrs, ExferenceStats n d m) -> do
+                      let hsE = convert qualification $ simplifyExpression e
+                      lift $ putStrLn $ prettyPrint hsE
+                      when (not $ null constrs) $ do
+                        let constrStrs = mapM (showHsConstraint tVarIndex)
+                                       $ S.toList
+                                       $ S.fromList
+                                       $ constrs
+                        lift $ putStrLn $ "but only with additional contraints: " ++ intercalate ", " constrStrs
+                      lift $ putStrLn $ replicate 40 ' ' ++ "(depth " ++ show d
+                                 ++ ", " ++ show n ++ " steps, " ++ show m ++ " max pqueue size)"
                 if
                   | PrintAll `elem` flags -> do
                       when (verbosity>0) $ lift $ putStrLn "[running findExpressions ..]"
-                      let rs = findExpressions input
-                      if null rs
-                        then lift $ putStrLn "[no results]"
-                        else forM_ rs
-                          $ \(e, constrs, ExferenceStats n d m) -> do
-                            let hsE = convert qualification $ simplifyExpression e
-                            lift $ putStrLn $ prettyPrint hsE
-                            when (not $ null constrs) $ do
-                              let constrStrs = mapM (showHsConstraint tVarIndex)
-                                             $ S.toList
-                                             $ S.fromList
-                                             $ constrs
-                              lift $ putStrLn $ "but only with additional contraints: " ++ intercalate ", " constrStrs
-                            lift $ putStrLn $ replicate 40 ' ' ++ "(depth " ++ show d
-                                        ++ ", " ++ show n ++ " steps, " ++ show m ++ " max pqueue size)"
+                      foo $ findExpressions input
                   | PrintTree `elem` flags -> do
                       when (verbosity>0) $ lift $ putStrLn "[running findExpressionsWithStats ..]"
                       let tree = chunkSearchTree $ last $ findExpressionsWithStats
@@ -278,8 +276,8 @@ main = runO $ do
                       let stats = chunkBindingUsages $ last $ findExpressionsWithStats input
                           highest = take 8 $ sortBy (flip $ comparing snd) $ M.toList stats
                       putStrLn $ show $ highest
-                  | otherwise -> do
-                      r <- if
+                  | otherwise ->
+                      foo =<< if
                         | FirstSol `elem` flags -> if par
                           then lift $ do
                             putStrLn $ "WARNING: parallel version not implemented for given flags, falling back to serial!"
@@ -309,19 +307,6 @@ main = runO $ do
                               else do
                                 when (verbosity>0) $ putStrLn "[running findFirstBestExpressionsLookaheadPreferNoConstraints ..]"
                                 return $ findFirstBestExpressionsLookaheadPreferNoConstraints 256 input {input_allowConstraints = True}
-                      case r :: [ExferenceOutputElement] of
-                        [] -> lift $ putStrLn "[no results]"
-                        rs -> rs `forM_` \(e, constrs, ExferenceStats n d m) -> do
-                            let hsE = convert qualification $ simplifyExpression e
-                            lift $ putStrLn $ prettyPrint hsE
-                            when (not $ null constrs) $ do
-                              let constrStrs = mapM (showHsConstraint tVarIndex)
-                                             $ S.toList
-                                             $ S.fromList
-                                             $ constrs
-                              lift $ putStrLn $ "but only with additional contraints: " ++ intercalate ", " constrStrs
-                            lift $ putStrLn $ replicate 40 ' ' ++ "(depth " ++ show d
-                                       ++ ", " ++ show n ++ " steps, " ++ show m ++ " max pqueue size)"
 
         -- printChecks     testHeuristicsConfig env
         -- printStatistics testHeuristicsConfig env
