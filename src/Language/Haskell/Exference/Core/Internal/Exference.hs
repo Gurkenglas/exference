@@ -315,7 +315,7 @@ rateUsage h = sumOf $ varUses . folded . to f where
   f k = - fromIntegral (k-1) * heuristics_tempMultiVarUsePenalty h
 
 getUnusedVarCount :: SearchNode -> Int
-getUnusedVarCount s = length $ filter (==0) $ s ^.. varUses . folded
+getUnusedVarCount = lengthOf $ varUses . folded . filtered (==0)
 
 -- Take one SearchNode, return some amount of sub-SearchNodes. Some of the
 -- returned SearchNodes may in fact be (potential) solutions that do not
@@ -342,10 +342,10 @@ stateStep multiPM allowConstrs h = do
   contxt <- use queryClassEnv
   constraintGoals' <- use constraintGoals
 
-  ((VarBinding var goalType, scopeId) Seq.:< gr) <- Seq.viewl <$> use goals
+  ((VarBinding var goalType, scopeId) Seq.:< gr) <- uses goals Seq.viewl
   goals .= gr
 
-  guard . (<= 200.0) =<< use depth
+  guard =<< uses depth (<= 200.0)
 
   let
     -- if type is TypeArrow, transform to lambda expression.
